@@ -346,16 +346,43 @@ c3b <- lm(formula =  gagnant_feedback_categorie != "Perdant" ~ simule_gagnant + 
           subset = variante_taxe_info == 'f' & abs(simule_gain) < 50,
           weights = weight)
 
+
+# Use triangular kernel weighting
+c3c <- lm(formula =  gagnant_feedback_categorie != "Perdant" ~ simule_gagnant + tax_acceptance +
+            simule_gain * simule_gagnant + single + hausse_depenses_par_uc +
+            sexe + statut_emploi + csp + region + diplome4 + taille_menage +
+            nb_14_et_plus + nb_adultes + fume + actualite + taille_agglo +
+            uc + niveau_vie + age_18_24 + age_25_34 + age_35_49 + age_50_64 +
+            percentile_revenu + I(pmin(percentile_revenu - 20, 0)) +
+            I(pmin(percentile_revenu - 70, 0)) + percentile_revenu_conjoint +
+            I(pmin(percentile_revenu_conjoint - 20, 0)) + I(pmin(percentile_revenu_conjoint -
+                                                                   70, 0)) +
+            # These are the additional controls for column 3
+            simule_gagnant * (gilets_jaunes > 0) +
+            simule_gagnant * tax_acceptance +
+            simule_gagnant * (gagnant_categorie!='Perdant') +
+            # These are interactions between the sub group variables and running variables
+            (simule_gain * simule_gagnant) * (gilets_jaunes > 0) +
+            (simule_gain * simule_gagnant) * tax_acceptance +
+            (simule_gain * simule_gagnant) * (gagnant_categorie!='Perdant') 
+          
+          ,
+          data = s, 
+          subset = variante_taxe_info == 'f' & abs(simule_gain) < 50,
+          weights = weight * (1 - (abs(simule_gain) / 50)))
+
 # Write to a table
 tab42_v4_gof <- tibble::tribble(~raw,        ~clean,         ~fmt,
                                 "nobs",      "Observations", 0,
                                 "r.squared", "$R^2$",        3)
-tab42_v4_rows <- tibble::tribble(~term,                         ~c3,                ~c3a,                ~c3b,
-                                 "Polynomial",                  "Global quadratic", "Global quadratic",  "Local linear",
-                                 "Interactions with polynomial", "",                 "X",                 "X")
-attr(tab42_v4_rows, 'position') <- 19:20
+tab42_v4_rows <- tibble::tribble(~term,                         ~c3,                ~c3a,                ~c3b,           ~c3c,
+                                 "Kernel",                      "Uniform",          "Uniform",           "Uniform",      "Triangular",
+                                 "Bandwidth",                   "Manual",           "Manual",            "Manual",       "Manual",
+                                 "Polynomial",                  "Global quadratic", "Global quadratic",  "Local linear", "Local linear",
+                                 "Interactions with polynomial", "",                 "X",                 "X",           "X")
+attr(tab42_v4_rows, 'position') <- 19:22
 sink("../figures_tables/table42_v4.tex")
-modelsummary(list(c3,c3a,c3b), output = "latex_tabular",
+modelsummary(list(c3,c3a,c3b,c3c), output = "latex_tabular",
              fmt = 3, statistic =c("({std.error})", "[{p.value}]"),
              coef_map = c("simule_gagnant" = "Predicted winner ($\\hat{\\Gamma} == 1$)", 
                           "tax_acceptanceTRUE" = "Initial tax acceptance ($A^0$)",
